@@ -12,14 +12,33 @@ def compare(name1, name2):
     image2 = cv2.imread(name2)
 
     # differences
-    difference = cv2.subtract(image1, image2)
-    result = not np.any(difference)
+    difference1 = cv2.subtract(image1, image2)
+    difference2 = cv2.subtract(image2, image1)
+    result1 = not np.any(difference1)
+    result2 = not np.any(difference2)
 
-    # comment out to check the differences in result.png
-    # cv2.imwrite("result.png", difference)
+    # --- take the absolute difference of the images ---
+    abs_diff = cv2.absdiff(image1, image2)
 
-    # if difference is all zeros it will return False
-    return result
+    # --- find percentage difference based on number of pixels that are not zero ---
+    percentage = (np.count_nonzero(abs_diff) * 100) / abs_diff.size
+
+    # images are same only when both results return True
+    if result1 is True & result2 is True:
+        return True, 0
+    elif result1 is True and result2 is False:
+        cv2.imwrite('result2.jpg', difference2)
+        print("The difference is: ", percentage, "%")
+        return False, percentage
+    elif result1 is False and result2 is True:
+        cv2.imwrite('result1.jpg', difference1)
+        print("The difference is: ", percentage, "%")
+        return False, percentage
+    else:
+        print(cv2.imwrite("result.jpg", difference1))
+        print("images are different from both sides")
+        print("The difference in First 'Pixel Track' is: ", percentage, "%")
+        return False, percentage
 
 
 @api_view(['POST'])  # POST request receives images
@@ -33,11 +52,11 @@ def images(request):
     default_storage.save(image1.name, image1)
     default_storage.save(image2.name, image2)
 
-    result = compare(image1.name, image2.name)
+    result, percentage = compare(image1.name, image2.name)
     text = "Images are same" if result is True else "Images are different"
 
     # json data to send
-    data = {'imageAreSame': result, 'message': text}
+    data = {'imageAreSame': result, 'difference_percentage': percentage}
 
     # delete images from local
     default_storage.delete(image1.name)
