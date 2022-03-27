@@ -2,8 +2,37 @@
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from django.core.files.storage import default_storage
+from django.http import FileResponse
 import cv2
 import numpy as np
+import pytesseract
+
+pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+
+
+def ocr(image_name):
+    img = cv2.imread(image_name)
+    hImg, wImg, _ = img.shape
+
+    boxes = pytesseract.image_to_data(img)
+    print(boxes)
+
+    words = []
+
+    for x, a in enumerate(boxes.splitlines()):
+        if x != 0:
+            a = a.split()
+            print(a)
+
+        if len(a) == 12:
+            x, y, w, h = int(a[6]), int(a[7]), int(a[8]), int(a[9])
+            cv2.rectangle(img, (x, y), (w + x, h + y), (0, 0, 255), 1)
+            cv2.putText(img, a[11], (x, y + 35), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0), 1)
+            words.append(a[11])
+
+    cv2.imwrite('result.jpg', img)
+    cv2.waitKey(0)
+    return words
 
 
 def compare(name1, name2):
@@ -53,7 +82,6 @@ def images(request):
     default_storage.save(image2.name, image2)
 
     result, percentage = compare(image1.name, image2.name)
-    text = "Images are same" if result is True else "Images are different"
 
     # json data to send
     data = {'imageAreSame': result, 'difference_percentage': percentage}
@@ -61,5 +89,22 @@ def images(request):
     # delete images from local
     default_storage.delete(image1.name)
     default_storage.delete(image2.name)
+
+    return Response(data)
+
+
+@api_view(['POST'])
+def get_texts(request):
+    image = request.FILES['image']
+    default_storage.save(image.name, image)
+
+    words = ocr(image.name)
+    data = {'words': words}
+
+    img = open('result.jpg', 'rb')
+
+    # response = FileResponse(img)
+    # return response
+    default_storage.delete(image.name)
 
     return Response(data)
